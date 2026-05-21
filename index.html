@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medical Research Assistant</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; background: #f5f4f0; color: #1a1a1a; min-height: 100vh; }
+  .page { max-width: 780px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  .header { margin-bottom: 2rem; padding-bottom: 1.25rem; border-bottom: 1px solid #ddd; }
+  .header h1 { font-size: 22px; font-weight: normal; color: #1a1a1a; margin-bottom: 4px; }
+  .header p { font-size: 14px; color: #666; }
+
+  .config-toggle { font-size: 13px; color: #555; cursor: pointer; text-decoration: underline; margin-bottom: 12px; display: inline-block; }
+  .config-panel { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; display: none; }
+  .config-panel.open { display: block; }
+  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+  .field label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; }
+  .field input { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 13px; font-family: monospace; background: #fafafa; color: #1a1a1a; }
+  .field input:focus { outline: none; border-color: #888; background: #fff; }
+
+  .save-btn { padding: 8px 18px; background: #1a1a1a; color: #fff; border: none; border-radius: 5px; font-size: 13px; cursor: pointer; font-family: Georgia, serif; }
+  .save-btn:hover { background: #333; }
+  .saved-msg { font-size: 12px; color: #2a7a2a; margin-left: 10px; display: none; }
+
+  .search-row { display: flex; gap: 10px; margin-bottom: 1.5rem; }
+  .search-row input { flex: 1; padding: 12px 16px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; font-family: Georgia, serif; background: #fff; color: #1a1a1a; }
+  .search-row input:focus { outline: none; border-color: #888; }
+  .search-btn { padding: 12px 24px; background: #1a1a1a; color: #fff; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; font-family: Georgia, serif; white-space: nowrap; }
+  .search-btn:hover { background: #333; }
+  .search-btn:disabled { background: #999; cursor: not-allowed; }
+
+  .status { font-size: 13px; color: #666; margin-bottom: 1rem; min-height: 20px; display: flex; align-items: center; gap: 8px; }
+  .spinner { width: 14px; height: 14px; border: 2px solid #ccc; border-top-color: #555; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-box { background: #fff0f0; border: 1px solid #f5c0c0; border-radius: 6px; padding: 12px 16px; font-size: 13px; color: #900; margin-bottom: 1rem; line-height: 1.5; }
+
+  .summary-card { background: #fff; border: 1px solid #ddd; border-left: 3px solid #1a1a1a; border-radius: 6px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+  .summary-card h2 { font-size: 14px; font-weight: bold; color: #1a1a1a; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-text { font-size: 15px; color: #1a1a1a; line-height: 1.75; white-space: pre-wrap; }
+
+  .results-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; }
+  .result-card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 10px; }
+  .result-num { font-size: 11px; color: #999; margin-bottom: 4px; }
+  .result-title { font-size: 14px; font-weight: bold; color: #1a1a1a; margin-bottom: 4px; line-height: 1.4; }
+  .result-meta { font-size: 12px; color: #777; margin-bottom: 8px; }
+  .result-abstract { font-size: 13px; color: #333; line-height: 1.65; margin-bottom: 8px; }
+  .result-link { font-size: 12px; color: #2255aa; text-decoration: none; }
+  .result-link:hover { text-decoration: underline; }
+
+  .tip { font-size: 12px; color: #888; font-style: italic; margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>Medical Research Assistant</h1>
+    <p>Search PubMed and get plain-English summaries of real research articles.</p>
+  </div>
+
+  <span class="config-toggle" onclick="toggleConfig()">&#9881; API settings</span>
+
+  <div class="config-panel" id="config-panel">
+    <div class="config-grid">
+      <div class="field">
+        <label>NCBI API key</label>
+        <input type="text" id="cfg-apikey" placeholder="Your NCBI API key" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Email (for NCBI)</label>
+        <input type="email" id="cfg-email" placeholder="your@email.com" />
+      </div>
+      <div class="field">
+        <label>Anthropic API key</label>
+        <input type="text" id="cfg-claude" placeholder="sk-ant-..." autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Max results</label>
+        <input type="number" id="cfg-max" value="5" min="1" max="20" style="font-family:Georgia,serif;" />
+      </div>
+    </div>
+    <button class="save-btn" onclick="saveConfig()">Save settings</button>
+    <span class="saved-msg" id="saved-msg">&#10003; Saved</span>
+  </div>
+
+  <div class="search-row">
+    <input type="text" id="search-input"
+      placeholder="e.g. vitamin D and memory loss in older adults"
+      onkeydown="if(event.key==='Enter')doSearch()" />
+    <button class="search-btn" id="search-btn" onclick="doSearch()">Search</button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div id="error-box" style="display:none;"></div>
+  <div id="summary-area" style="display:none;"></div>
+  <div id="results-area"></div>
+  <p class="tip" id="tip" style="display:none;">Tip: Click any &ldquo;View on PubMed&rdquo; link to read the full article on the government website.</p>
+
+</div>
+<script>
+let cfg = { apikey: '', email: '', claude: '', max: 5 };
+
+function toggleConfig() {
+  const p = document.getElementById('config-panel');
+  p.classList.toggle('open');
+}
+
+function saveConfig() {
+  cfg.apikey = document.getElementById('cfg-apikey').value.trim();
+  cfg.email  = document.getElementById('cfg-email').value.trim();
+  cfg.claude = document.getElementById('cfg-claude').value.trim();
+  cfg.max    = parseInt(document.getElementById('cfg-max').value) || 5;
+  localStorage.setItem('mraConfig', JSON.stringify(cfg));
+  const m = document.getElementById('saved-msg');
+  m.style.display = 'inline';
+  setTimeout(() => m.style.display = 'none', 2000);
+}
+
+function truncateText(text, max) {
+  const s = String(text || '');
+  return s.length > max ? s.slice(0, max) + '...' : s;
+}
+
+function loadConfig() {
+  const stored = localStorage.getItem('mraConfig');
+  if (!stored) return;
+  try {
+    const saved = JSON.parse(stored);
+    cfg.apikey = saved.apikey || '';
+    cfg.email = saved.email || '';
+    cfg.claude = saved.claude || '';
+    cfg.max = saved.max || 5;
+    document.getElementById('cfg-apikey').value = cfg.apikey;
+    document.getElementById('cfg-email').value = cfg.email;
+    document.getElementById('cfg-claude').value = cfg.claude;
+    document.getElementById('cfg-max').value = cfg.max;
+  } catch (err) {
+    console.warn('Failed to load saved settings', err);
+  }
+}
+
+async function logToServer(message) {
+  try {
+    await fetch('/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+  } catch (err) {
+    console.warn('Failed to send log', err);
+  }
+}
+
+window.addEventListener('DOMContentLoaded', loadConfig);
+
+function setStatus(msg, spinning) {
+  const el = document.getElementById('status');
+  el.innerHTML = spinning
+    ? `<div class="spinner"></div><span>${msg}</span>`
+    : `<span>${msg}</span>`;
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-box');
+  el.innerHTML = msg;
+  el.style.display = 'block';
+  el.className = 'error-box';
+}
+
+function clearError() {
+  document.getElementById('error-box').style.display = 'none';
+}
+
+async function doSearch() {
+  const query = document.getElementById('search-input').value.trim();
+  if (!query) return;
+  if (!cfg.claude) {
+    showError('Please open <strong>API settings</strong> above, fill in all fields, and click Save settings before searching.');
+    return;
+  }
+
+  logToServer(`Search started: "${query}"`);
+  clearError();
+  document.getElementById('results-area').innerHTML = '';
+  document.getElementById('summary-area').style.display = 'none';
+  document.getElementById('tip').style.display = 'none';
+  document.getElementById('search-btn').disabled = true;
+
+  const params = new URLSearchParams({
+    db: 'pubmed', term: query, retmax: cfg.max,
+    retmode: 'json', usehistory: 'y',
+    tool: 'medical-research-assistant',
+    ...(cfg.apikey && { api_key: cfg.apikey }),
+    ...(cfg.email  && { email: cfg.email })
+  });
+
+  setStatus('Searching PubMed...', true);
+
+  let pmids, webenv, querykey;
+  try {
+    const res = await fetch(`/ncbi/entrez/eutils/esearch.fcgi?${params}`);
+    if (!res.ok) throw new Error(`PubMed returned status ${res.status}`);
+    const data = await res.json();
+    pmids = data.esearchresult?.idlist || [];
+    webenv = data.esearchresult?.webenv;
+    querykey = data.esearchresult?.querykey;
+  } catch(e) {
+    logToServer(`Search error: ${e.message}`);
+    showError(`Could not reach PubMed. Make sure the server.py window is still open and try again.<br><small>Detail: ${e.message}</small>`);
+    setStatus('', false);
+    document.getElementById('search-btn').disabled = false;
+    return;
+  }
+
+  if (!pmids.length) {
+    logToServer(`Search found 0 results for: "${query}"`);
+    setStatus('No results found. Try different search words.', false);
+    document.getElementById('search-btn').disabled = false;
+    return;
+  }
+
+  logToServer(`Search found ${pmids.length} articles for: "${query}"`);
+  setStatus(`Found ${pmids.length} articles. Fetching abstracts...`, true);
+
+  const fetchParams = new URLSearchParams({
+    db: 'pubmed', WebEnv: webenv, query_key: querykey,
+    rettype: 'abstract', retmode: 'xml',
+    tool: 'medical-research-assistant',
+    ...(cfg.apikey && { api_key: cfg.apikey }),
+    ...(cfg.email  && { email: cfg.email })
+  });
+
+  let xmlText;
+  try {
+    const res2 = await fetch(`/ncbi/entrez/eutils/efetch.fcgi?${fetchParams}`);
+    if (!res2.ok) throw new Error(`Status ${res2.status}`);
+    xmlText = await res2.text();
+  } catch(e) {
+    logToServer(`Fetch abstracts error: ${e.message}`);
+    showError(`Could not fetch article abstracts. Please try again.<br><small>Detail: ${e.message}</small>`);
+    setStatus('', false);
+    document.getElementById('search-btn').disabled = false;
+    return;
+  }
+
+  const articles = parseXML(xmlText, pmids);
+  renderArticles(articles);
+  const summaryLimit = Math.min(5, articles.length);
+  setStatus(
+    articles.length > summaryLimit
+      ? `Summarizing top ${summaryLimit} of ${articles.length} articles...`
+      : `Summarizing ${articles.length} articles...`,
+    true
+  );
+  const articlesForPrompt = articles.slice(0, summaryLimit);
+  const articlesText = articlesForPrompt.map((a, i) => {
+    const shortAbstract = truncateText(a.abstract, 250);
+    const shortTitle = truncateText(a.title, 200);
+    const shortAuthors = truncateText(a.authors, 80);
+    const shortJournal = truncateText(a.journal, 80);
+    return `[${i+1}] PMID: ${a.pmid}\nTitle: ${shortTitle}\nAuthors: ${shortAuthors}\nYear: ${a.year}\nJournal: ${shortJournal}\nAbstract: ${shortAbstract}`;
+  }).join('\n\n---\n\n');
+
+  const prompt = `You are a medical research summarizer. Below are ${articlesForPrompt.length} PubMed articles from the search: "${query}"\n\nPlease write:\n1. A plain-English overview (3-5 sentences) of what the research collectively says.\n2. A brief 1-2 sentence summary of each individual article, referenced as [1], [2], etc.\n\nKeep language simple - the reader is not a scientist. Do not reproduce full text verbatim.\n\nARTICLES:\n\n${articlesText}`;
+
+  try {
+    logToServer(`Sending ${articlesForPrompt.length} articles to Claude for summary`);
+    const claudeRes = await fetch('/anthropic', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.claude },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const claudeData = await claudeRes.json();
+    if (claudeData.error) throw new Error(claudeData.error.message || JSON.stringify(claudeData.error));
+    const summary = claudeData.content?.map(b => b.text || '').join('') || '';
+    if (summary) {
+      logToServer(`Summary generated successfully`);
+      const sa = document.getElementById('summary-area');
+      sa.style.display = 'block';
+      const summaryNote = articlesForPrompt.length < articles.length
+        ? `<p class="tip">Note: the summary is based on the top ${articlesForPrompt.length} articles from the search results.</p>`
+        : '';
+      sa.innerHTML = `<div class="summary-card"><h2>Plain-English Summary</h2><div class="summary-text">${esc(summary)}</div>${summaryNote}</div>`;
+    }
+    setStatus(`Done. ${articles.length} articles found for &ldquo;${esc(query)}&rdquo;.`, false);
+  } catch(e) {
+    logToServer(`Summary generation error: ${e.message}`);
+    setStatus(`Articles loaded. Could not generate summary: ${e.message}`, false);
+  }
+
+  document.getElementById('tip').style.display = 'block';
+  document.getElementById('search-btn').disabled = false;
+}
+
+function parseXML(xml, pmids) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  const out = [];
+
+  // If DOMParser failed or returned an error document, bail out
+  if (doc.querySelector('parsererror')) {
+    console.error('XML parse error', doc.querySelector('parsererror').textContent);
+    return out;
+  }
+
+  const articleNodes = doc.querySelectorAll('PubmedArticle');
+  console.log('Found PubmedArticle nodes:', articleNodes.length);
+
+  articleNodes.forEach((node, i) => {
+    // PMID: use the first PMID in this article only
+    const pmid = node.querySelector('MedlineCitation > PMID')?.textContent?.trim() || pmids[i] || '';
+
+    // Title: strip any child tags (e.g. italics) by using textContent safely
+    const titleNode = node.querySelector('ArticleTitle');
+    const title = titleNode ? titleNode.textContent.trim().slice(0, 200) : 'No title';
+
+    // Year
+    const year = node.querySelector('PubDate > Year')?.textContent?.trim()
+              || node.querySelector('PubDate > MedlineDate')?.textContent?.trim().slice(0,4) || '';
+
+    // Journal title
+    const journal = node.querySelector('Journal > Title')?.textContent?.trim().slice(0, 100) || '';
+
+    // Authors: last name + first initial, max 3
+    const auNodes = node.querySelectorAll('AuthorList > Author');
+    const authorList = Array.from(auNodes).slice(0, 3).map(a => {
+      const ln = a.querySelector('LastName')?.textContent?.trim() || '';
+      const fn = a.querySelector('ForeName')?.textContent?.trim().charAt(0) || '';
+      const col = a.querySelector('CollectiveName')?.textContent?.trim() || '';
+      return ln ? (fn ? `${ln} ${fn}` : ln) : col;
+    }).filter(Boolean).join(', ');
+    const authors = authorList + (auNodes.length > 3 ? ' et al.' : '');
+
+    // Abstract: collect only direct AbstractText nodes, cap each at 300 chars
+    const abNodes = node.querySelectorAll('Abstract > AbstractText');
+    let abstract = 'No abstract available.';
+    if (abNodes.length > 0) {
+      abstract = Array.from(abNodes).map(n => {
+        const lbl = n.getAttribute('Label');
+        const txt = n.textContent.trim().slice(0, 300);
+        return lbl ? `${lbl}: ${txt}` : txt;
+      }).join(' ').trim();
+    }
+
+    // Hard cap the abstract at 600 chars total just in case
+    if (abstract.length > 600) abstract = abstract.slice(0, 600) + '...';
+
+    console.log(`Article ${i+1}: pmid=${pmid}, title=${title.slice(0,40)}, abstract length=${abstract.length}`);
+    out.push({ pmid, title, authors, year, journal, abstract });
+  });
+  return out;
+}
+
+function renderArticles(articles) {
+  const area = document.getElementById('results-area');
+  area.innerHTML = `<div class="results-label">Source articles (${articles.length})</div>` +
+    articles.map((a, i) => `
+      <div class="result-card">
+        <div class="result-num">Article ${i+1}</div>
+        <div class="result-title">${esc(a.title)}</div>
+        <div class="result-meta">${esc(a.authors)}${a.year ? ' &middot; ' + a.year : ''}${a.journal ? ' &middot; ' + esc(a.journal) : ''}</div>
+        <div class="result-abstract">${esc(a.abstract.length > 450 ? a.abstract.slice(0,450) + '...' : a.abstract)}</div>
+        <a class="result-link" href="https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/" target="_blank">View on PubMed &rarr;</a>
+      </div>`).join('');
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
