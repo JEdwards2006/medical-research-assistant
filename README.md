@@ -8,6 +8,7 @@ A local browser-based interface for searching PubMed and generating plain-Englis
 - Proxies PubMed (`NCBI E-utilities`) requests through `server.py` to avoid CORS issues.
 - Loads PubMed search results and article abstracts in the browser.
 - Sends a summary prompt to Anthropic Claude via the local proxy and displays the returned summary.
+- Shows individual "Ask Claude about this article" links for each PubMed result, letting the user summarize one article at a time.
 - Saves API settings locally in the browser so you don't need to re-enter keys after reloads.
 
 ## Files
@@ -16,6 +17,7 @@ A local browser-based interface for searching PubMed and generating plain-Englis
 - `server.py` - local HTTP proxy server for PubMed and Anthropic API calls.
 - `START - Medical Research Assistant.bat` - Windows launcher script.
 - `favicon.ico` - browser tab icon.
+- `app.log` - optional rolling server log file created during runtime.
 
 ## Prerequisites
 
@@ -50,13 +52,16 @@ A local browser-based interface for searching PubMed and generating plain-Englis
 3. Articles are displayed in the UI with title, authors, journal, year, and truncated abstract.
 4. The top 5 articles are summarized by Claude using a shortened prompt.
 5. A plain-English summary appears in the page.
+6. Each article also includes a dedicated "Ask Claude about this article" link to summarize that article individually.
 
 ## Notes and behavior
 
 - The summary is limited to the first 5 articles to avoid sending too much text to Anthropic.
 - If more than 5 articles are retrieved, the UI displays a note explaining that the summary is based on the top 5 articles.
+- Each search result also offers an individual article summary link that sends only that one article to Claude.
 - API settings are saved in browser storage and restored on page load.
 - The server proxy provides CORS support and forwards requests from the browser.
+- The server maintains a rolling `app.log` file limited to 10,000 lines for debugging.
 
 ## Troubleshooting
 
